@@ -1,74 +1,74 @@
 # Doc-KB System
 
-Document Knowledge Base — AI-powered document management system with full-text search, classification, knowledge graph, and semantic recommendations.
+文档知识库系统 — AI 驱动的文档管理平台，支持全文搜索、自动分类、知识图谱、语义推荐和文档健康检查。
 
-## Architecture
+## 系统架构
 
 ```
 ┌──────────────┐    ┌───────────┐    ┌──────────────┐
-│   Frontend    │───▶│  Backend   │───▶│   Postgres    │
-│   (Vue 3)     │    │ (FastAPI)  │    │  (pgvector)   │
-└──────────────┘    │            │    ├──────────────┤
-                    │            │───▶│ Elasticsearch │
-┌──────────────┐    │            │    ├──────────────┤
-│  Doc Parser   │───▶│            │───▶│    Ollama     │
-│  (Standalone) │    └───────────┘    │ (qwen2.5:7b)  │
+│   前端       │───▶│  后端      │───▶│   PostgreSQL  │
+│   (Vue 3)    │    │ (FastAPI) │    │  (pgvector)   │
+└──────────────┘    │           │    ├──────────────┤
+                    │           │───▶│ Elasticsearch │
+┌──────────────┐    │           │    ├──────────────┤
+│  文档解析器   │───▶│           │───▶│    Ollama     │
+│  (独立服务)   │    └───────────┘    │ (qwen2.5:7b)  │
 └──────────────┘                      │  + bge-m3     │
                                       └──────────────┘
 ```
 
-## Services
+## 服务列表
 
-| Service | Description | Default Resources |
-|---------|-------------|-------------------|
-| `postgres` | pgvector DB (documents, embeddings, metadata) | 2GB RAM, 2 CPUs |
-| `elasticsearch` | Full-text search engine with IK analyzer | 2GB RAM, 2 CPUs |
-| `ollama` | LLM (qwen2.5:7b) + embedding (bge-m3) models | 12GB RAM, 6 CPUs |
-| `doc-parser` | Background doc scanning & text extraction | 1GB RAM, 2 CPUs |
-| `backend` | FastAPI API server + pipeline orchestrator | 1GB RAM, 1 CPU |
-| `frontend` | Vue 3 SPA via nginx | 256MB RAM, 0.5 CPU |
+| 服务 | 说明 | 默认资源 |
+|------|------|----------|
+| `postgres` | pgvector 数据库（文档、向量嵌入、元数据） | 2GB 内存, 2 CPU |
+| `elasticsearch` | 全文搜索引擎（IK 中文分词） | 2GB 内存, 2 CPU |
+| `ollama` | 大语言模型 qwen2.5:7b + 嵌入模型 bge-m3 | 12GB 内存, 6 CPU |
+| `doc-parser` | 后台文档扫描与文本提取 | 1GB 内存, 2 CPU |
+| `backend` | FastAPI API 服务 + 流水线调度 | 1GB 内存, 1 CPU |
+| `frontend` | Vue 3 单页应用（Nginx 托管） | 256MB 内存, 0.5 CPU |
 
-## Requirements
+## 环境要求
 
-- **Linux** server (x86_64, Ubuntu/Debian recommended)
-- **16GB+ RAM** (minimum, 32GB recommended — Ollama qwen2.5:7b uses ~8GB)
-- **50GB+ free disk** (for DB, ES indices, cached parses)
-- Docker & Docker Compose (installed by script)
-- SMB or NFS mount for document source (optional but typical)
+- **Linux** 服务器（x86_64，推荐 Ubuntu/Debian）
+- **16GB+ 内存**（最低要求，推荐 32GB — Ollama qwen2.5:7b 占用约 8GB）
+- **50GB+ 空闲磁盘**（用于数据库、ES 索引、缓存解析结果）
+- Docker 与 Docker Compose（安装脚本会自动安装）
+- SMB 或 NFS 挂载的文档源（可选，通常需要）
 
-## Quick Start
+## 快速开始
 
 ```bash
-# 1. Clone
-git clone https://github.com/your-org/doc-kb-system.git
+# 1. 克隆仓库
+git clone https://github.com/CocoWorkbody/doc-kb-system.git
 cd doc-kb-system
 
-# 2. Configure
+# 2. 配置环境变量
 cp .env.example .env
-vi .env                          # Set PG_PASSWORD and JWT_SECRET
+vi .env                          # 设置 PG_PASSWORD 和 JWT_SECRET
 
-# 3. Run installer (as root)
+# 3. 运行安装脚本（需 root 权限）
 sudo bash install.sh
 
-# 4. Mount your document source
+# 4. 挂载文档源
 mount -t cifs //nas-server/share /data/originals -o username=user,password=pass
-# OR symlink an NFS mount
+# 或使用 NFS 挂载
 
-# 5. Access the UI at http://<your-server-ip>
+# 5. 访问前端界面 http://<服务器IP>
 ```
 
-## Configuration
+## 配置说明
 
-### Environment Variables (`.env`)
+### 环境变量（`.env`）
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `PG_PASSWORD` | **Yes** | — | PostgreSQL password |
-| `JWT_SECRET` | **Yes** | — | JWT signing secret (min 32 chars) |
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `PG_PASSWORD` | **是** | — | PostgreSQL 密码 |
+| `JWT_SECRET` | **是** | — | JWT 签名密钥（最少 32 字符） |
 
-### Docker Compose Override
+### Docker Compose 自定义
 
-Customize resource limits or port mappings by creating `docker-compose.override.yml`:
+通过创建 `docker-compose.override.yml` 自定义资源限制或端口映射：
 
 ```yaml
 services:
@@ -80,69 +80,69 @@ services:
           cpus: '4'
 ```
 
-### Adding Document Sources
+### 添加文档源
 
-Sources are managed through the UI or directly via the API:
+可通过管理界面或 API 添加文档源：
 
 ```bash
 curl -X POST http://localhost:8000/api/sources \
   -H "Content-Type: application/json" \
-  -d '{"name": "My Books", "path": "/data/originals", "source_type": "smb"}'
+  -d '{"name": "我的书库", "path": "/data/originals", "source_type": "smb"}'
 ```
 
-## Data Flow
+## 数据处理流程
 
-1. **Scan** — `_continuous_scan_loop` runs every 5 min, adds new files from sources to DB
-2. **Parse** — Pipeline extracts text from `.txt/.epub/.mobi/.azw3/.doc` files (PDF skipped)
-3. **Enrich** — Ollama qwen2.5:7b classifies each doc (title, author, genre, summary, tags)
-4. **Embed** — bge-m3 generates vector embeddings for semantic search
-5. **Index** — Document indexed into Elasticsearch for full-text search
+1. **扫描** — `_continuous_scan_loop` 每 5 分钟运行，将新增文件添加到数据库
+2. **解析** — 流水线从 `.txt/.epub/.mobi/.azw3/.doc` 文件提取文本（PDF 默认跳过）
+3. **增强** — Ollama qwen2.5:7b 对每篇文档进行分类（标题、作者、体裁、摘要、标签）
+4. **嵌入** — bge-m3 生成向量嵌入用于语义搜索
+5. **索引** — 文档写入 Elasticsearch 实现全文搜索
 
-## Health Check Module
+## 健康检查模块
 
-The standalone health checker scans a directory and validates file integrity:
+独立健康检查器可扫描目录并验证文件完整性：
 
 ```bash
-# Via API
+# 通过 API
 curl http://localhost:8000/api/health-check/sources
 curl -X POST "http://localhost:8000/api/health-check/start?scan_root=/data/originals"
 
-# Browse subdirectories
+# 浏览子目录
 curl "http://localhost:8000/api/health-check/browse?path=/data/originals"
 ```
 
-## Maintenance
+## 运维管理
 
-### Backup (automatic daily)
+### 备份（每日自动）
 
-Run manually:
+手动执行：
 ```bash
 ./backup.sh
 ```
 
-Backups are stored at `/mnt/nas/FileZol/backups/postgres/` (or configure your own).
+备份文件存储在 `/mnt/nas/FileZol/backups/postgres/`（可自定义路径）。
 
-### Restore
+### 恢复
 
 ```bash
 docker exec -i postgres pg_restore -U docadmin -d docdb \
   --format=custom --clean < /path/to/backup.dump
 ```
 
-### Clean stale Docker resources
+### 清理 Docker 资源
 
 ```bash
 docker system prune -f
 docker image prune -a -f
 ```
 
-## Pipeline Status
+## 流水线状态
 
 ```bash
 curl http://localhost:8000/api/documents/pipeline-status
 # {"running":true,"phase":"enrich","current":42,"total":6150,"errors":5}
 ```
 
-## License
+## 许可证
 
 MIT
