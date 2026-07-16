@@ -40,7 +40,7 @@ Document Knowledge Base — AI-powered document management system with full-text
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/CocoWorkbody/doc-kb-system.git
+git clone https://github.com/RexLabAIzone/doc-kb-system.git
 cd doc-kb-system
 
 # 2. 配置环境变量
