@@ -1,0 +1,8 @@
+openpyxl
+Pillow
+PyMuPDF
+python-docx
+striprtf
+chardet
+ollama
+tqdm

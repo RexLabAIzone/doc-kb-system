@@ -1,0 +1,9 @@
+psycopg2-binary==2.9.10
+python-magic==0.4.27
+pycryptodome==3.21.0
+retry==0.9.2
+python-dotenv==1.0.1
+python-docx==1.1.2
+PyMuPDF==1.25.5
+pytesseract==0.3.13
+Pillow==11.1.0

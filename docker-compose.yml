@@ -1,0 +1,197 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: docdb
+      POSTGRES_USER: docadmin
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+    - 127.0.0.1:5432:5432
+    volumes:
+    - pg-data:/var/lib/postgresql/data
+    - ./services/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+    - internal
+    healthcheck:
+      test:
+      - CMD
+      - pg_isready
+      - -U
+      - docadmin
+      - -d
+      - docdb
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+    command: 'postgres -c shared_buffers=512MB -c effective_cache_size=2GB -c max_connections=30 -c work_mem=16MB'
+  elasticsearch:
+    image: elasticsearch:8.17.4
+    container_name: elasticsearch
+    restart: always
+    environment:
+    - discovery.type=single-node
+    - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    - xpack.security.enabled=false
+    - bootstrap.memory_lock=false
+    - ingest.geoip.downloader.enabled=false
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+    - 127.0.0.1:9200:9200
+    volumes:
+    - es-data:/usr/share/elasticsearch/data
+    - ./services/elasticsearch/ik-setup.sh:/ik-setup.sh
+    networks:
+    - internal
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -sf http://localhost:9200/_cluster/health 2>/dev/null | grep -qE 'green|yellow'
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    environment:
+    - OLLAMA_HOST=0.0.0.0
+    - OLLAMA_KEEP_ALIVE=24h
+    ports:
+    - 127.0.0.1:11434:11434
+    volumes:
+    - ollama-data:/root/.ollama
+    networks:
+    - internal
+    deploy:
+      resources:
+        limits:
+          memory: 12G
+          cpus: '6'
+    entrypoint:
+    - /bin/sh
+    - -c
+    command:
+    - >-
+      /bin/ollama serve & sleep 15; for m in qwen2.5:7b bge-m3; do ollama list | grep -q "${m}" || ollama pull ${m}; done; echo "Models ready."; wait
+  doc-parser:
+    build: ./services/parser
+    container_name: doc-parser
+    restart: always
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_NAME: docdb
+      DB_USER: docadmin
+      DB_PASS: ${PG_PASSWORD}
+      DOC_ROOT: /data/originals
+      SCAN_INTERVAL: '3600'
+    volumes:
+    - /mnt/smb/电子书:/data/originals:ro
+    networks:
+    - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2'
+    command:
+    - python
+    - main.py
+  backend:
+    build: ./services/backend
+    container_name: backend
+    restart: always
+    environment:
+      DB_URL: postgresql://docadmin:${PG_PASSWORD}@postgres:5432/docdb
+      ES_URL: http://elasticsearch:9200
+      OLLAMA_URL: http://ollama:11434
+      SECRET_KEY: ${JWT_SECRET}
+      DOCUMENTS_ROOT: /data/originals
+      OUTPUT_ROOT: /data/output
+    ports:
+    - 8000:8000
+    volumes:
+    - /mnt/smb/电子书:/data/originals:ro
+    - /mnt/nas/FileZol:/data/output:rw
+    - ./services/backend:/app:ro
+    - ./services/health-check:/opt/health-check:ro
+    networks:
+    - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+    command:
+    - uvicorn
+    - main:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8000'
+  frontend:
+    build: ./services/frontend
+    volumes:
+    - ./services/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    container_name: frontend
+    restart: always
+    ports:
+    - 80:80
+    - 443:443
+    networks:
+    - internal
+    depends_on:
+    - backend
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 172.30.0.0/16
+volumes:
+  pg-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/postgres
+  es-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/elasticsearch
+  ollama-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/nas/FileZol/ollama-models
