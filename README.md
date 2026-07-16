@@ -1,6 +1,6 @@
 # Doc-KB System
 
-文档知识库系统 — AI 驱动的文档管理平台，支持全文搜索、自动分类、知识图谱、语义推荐和文档健康检查。
+Document Knowledge Base — AI-powered document management system with full-text search, classification, knowledge graph, semantic recommendations, and health check.
 
 ## 系统架构
 
